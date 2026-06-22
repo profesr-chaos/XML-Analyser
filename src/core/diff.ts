@@ -1,31 +1,44 @@
 import { diffLines, type Change } from "diff";
 import type { AnalysisResult, DataType, ElementStats } from "./types";
 
-/** Pretty-print XML with indentation so line diffs are meaningful. */
+const esc = (s: string) =>
+  s.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" })[c]!);
+const escAttr = (s: string) =>
+  s.replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" })[c]!);
+
+/** Opening tag built directly from name + attributes — O(1) per element. */
+function openTag(el: Element): string {
+  let s = "<" + el.tagName;
+  for (const a of Array.from(el.attributes)) s += ` ${a.name}="${escAttr(a.value)}"`;
+  return s;
+}
+
+function directText(el: Element): string {
+  let t = "";
+  for (const n of Array.from(el.childNodes)) if (n.nodeType === 3) t += n.nodeValue ?? "";
+  return t.trim();
+}
+
+/**
+ * Pretty-print XML with indentation so line diffs are meaningful.
+ * O(N): each element's tag is constructed once, never re-serialized.
+ * ponytail: recursive walk; switch to an explicit stack if XML nests past ~10k deep.
+ */
 export function prettyXml(xml: string): string {
   const doc = new DOMParser().parseFromString(xml, "application/xml");
   if (doc.querySelector("parsererror") || !doc.documentElement) return xml;
   const out: string[] = [];
-  const ser = new XMLSerializer();
 
   function walk(el: Element, indent: string) {
-    const open = ser.serializeToString(el);
-    const childEls = Array.from(el.children);
-    const text = Array.from(el.childNodes)
-      .filter((n) => n.nodeType === 3)
-      .map((n) => n.nodeValue ?? "")
-      .join("")
-      .trim();
-
+    const childEls = el.children;
+    const text = directText(el);
     if (!childEls.length) {
-      // leaf: serialize whole element on one line, collapsed whitespace
-      out.push(indent + open.replace(/>\s+</g, "><").replace(/\n\s*/g, " ").trim());
+      out.push(text ? `${indent}${openTag(el)}>${esc(text)}</${el.tagName}>` : `${indent}${openTag(el)}/>`);
       return;
     }
-    const tagOpen = open.slice(0, open.indexOf(">") + 1);
-    out.push(indent + tagOpen + (text ? " " + text : ""));
-    for (const c of childEls) walk(c, indent + "  ");
-    out.push(indent + `</${el.tagName}>`);
+    out.push(indent + openTag(el) + ">" + (text ? " " + esc(text) : ""));
+    for (let i = 0; i < childEls.length; i++) walk(childEls[i], indent + "  ");
+    out.push(`${indent}</${el.tagName}>`);
   }
   walk(doc.documentElement, "");
   return out.join("\n");
