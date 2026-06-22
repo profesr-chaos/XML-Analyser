@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import type { AnalysisResult, DataType } from "../core/types";
-import { useStore, leaf } from "../state/store";
+import { useStore } from "../state/store";
+import PathLabel from "./PathLabel";
 
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
@@ -15,7 +16,6 @@ export default function SummaryTab({ result }: { result: AnalysisResult }) {
   const setSelected = useStore((s) => s.setSelected);
   const setNsFilter = useStore((s) => s.setNsFilter);
   const nsFilter = useStore((s) => s.nsFilter);
-  const fullPaths = useStore((s) => s.fullPaths);
 
   const { top, typeDist, totalTyped } = useMemo(() => {
     const top = Array.from(result.pathStats.values())
@@ -57,12 +57,10 @@ export default function SummaryTab({ result }: { result: AnalysisResult }) {
               onClick={() => setSelected(s.path)}
               className="flex items-center gap-2 cursor-pointer hover:text-[var(--color-accent)]"
             >
-              <div className="w-48 truncate text-sm" title={s.path}>
-                {fullPaths ? s.path : leaf(s.path)}
-              </div>
+              <PathLabel path={s.path} className="w-48 truncate text-sm" />
               <div className="flex-1 bg-[var(--color-panel2)] rounded h-3 overflow-hidden">
                 <div
-                  className="bg-[var(--color-accent)] h-full"
+                  className="bg-[var(--color-bar)] h-full"
                   style={{ width: `${(s.count / top[0].count) * 100}%` }}
                 />
               </div>
@@ -81,7 +79,7 @@ export default function SummaryTab({ result }: { result: AnalysisResult }) {
               <div key={t} className="flex items-center gap-2 text-sm">
                 <div className="w-20">{t}</div>
                 <div className="flex-1 bg-[var(--color-panel2)] rounded h-3 overflow-hidden">
-                  <div className="bg-emerald-500 h-full" style={{ width: `${(n / totalTyped) * 100}%` }} />
+                  <div className="bg-[var(--color-bar)] h-full" style={{ width: `${(n / totalTyped) * 100}%` }} />
                 </div>
                 <div className="w-24 text-right text-[var(--color-muted)]">
                   {n} ({((n / totalTyped) * 100).toFixed(1)}%)
@@ -99,22 +97,22 @@ export default function SummaryTab({ result }: { result: AnalysisResult }) {
               ⚠️ Undefined prefixes: {result.undefinedNamespaces.join(", ")}
             </div>
           )}
-          <table className="w-full text-sm border border-[var(--color-border)]">
-            <thead className="bg-[var(--color-panel2)] text-left text-[var(--color-muted)]">
+          <table className="tbl">
+            <thead>
               <tr>
-                <th className="p-2">Prefix</th>
-                <th className="p-2">URI</th>
-                <th className="p-2 text-right">Elements</th>
-                <th className="p-2"></th>
+                <th>Prefix</th>
+                <th>URI</th>
+                <th className="num">Elements</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {result.namespaces.map((ns) => (
-                <tr key={ns.uri} className="border-t border-[var(--color-border)]">
-                  <td className="p-2">{ns.prefix ?? "(default)"}</td>
-                  <td className="p-2 font-mono text-xs">{ns.uri}</td>
-                  <td className="p-2 text-right">{ns.elementCount}</td>
-                  <td className="p-2">
+                <tr key={ns.uri}>
+                  <td>{ns.prefix ?? "(default)"}</td>
+                  <td className="font-mono text-xs">{ns.uri}</td>
+                  <td className="num">{ns.elementCount}</td>
+                  <td>
                     <button
                       onClick={() => setNsFilter(nsFilter === ns.uri ? undefined : ns.uri)}
                       className={`text-xs px-2 py-0.5 rounded border border-[var(--color-border)] ${

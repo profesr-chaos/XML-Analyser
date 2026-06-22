@@ -1,5 +1,6 @@
 import type { AnalysisResult, DataType, ElementStats } from "../core/types";
 import { useStore } from "../state/store";
+import PathLabel from "./PathLabel";
 
 function Breadcrumb({ path }: { path: string }) {
   const setSelected = useStore((s) => s.setSelected);
@@ -58,7 +59,7 @@ function Bars({ stats }: { stats: ElementStats }) {
           <div key={t} className="flex items-center gap-2 text-sm">
             <div className="w-20">{t}</div>
             <div className="flex-1 bg-[var(--color-panel2)] rounded h-3 overflow-hidden">
-              <div className="bg-[var(--color-accent)] h-full" style={{ width: `${(n / total) * 100}%` }} />
+              <div className="bg-[var(--color-bar)] h-full" style={{ width: `${(n / total) * 100}%` }} />
             </div>
             <div className="w-20 text-right text-[var(--color-muted)]">
               {((n / total) * 100).toFixed(0)}%
@@ -85,7 +86,7 @@ export default function ElementDetailTab({ result }: { result: AnalysisResult })
     <div className="p-4 space-y-5 overflow-auto">
       <div>
         <Breadcrumb path={stats.path} />
-        <h2 className="text-lg font-semibold font-mono">{stats.path}</h2>
+        <PathLabel path={stats.path} className="text-lg font-semibold font-mono block" />
         <div className="text-sm text-[var(--color-muted)] mt-1">
           {stats.count} occurrences
           {stats.namespace && <> · ns <code>{stats.namespace}</code></>}
@@ -130,16 +131,16 @@ export default function ElementDetailTab({ result }: { result: AnalysisResult })
       {Object.keys(stats.attrs).length > 0 && (
         <section>
           <h3 className="font-semibold mb-2">Attributes</h3>
-          <table className="w-full text-sm border border-[var(--color-border)]">
-            <thead className="bg-[var(--color-panel2)] text-left text-[var(--color-muted)]">
-              <tr><th className="p-2">Name</th><th className="p-2">Type</th><th className="p-2">Required</th></tr>
+          <table className="tbl">
+            <thead>
+              <tr><th>Name</th><th>Type</th><th>Required</th></tr>
             </thead>
             <tbody>
               {Object.entries(stats.attrs).map(([an, types]) => (
-                <tr key={an} className="border-t border-[var(--color-border)]">
-                  <td className="p-2 font-mono">{an}</td>
-                  <td className="p-2">{Object.keys(types).join(", ")}</td>
-                  <td className="p-2">{stats.requiredAttrs.has(an) ? "required" : "optional"}</td>
+                <tr key={an}>
+                  <td className="font-mono">{an}</td>
+                  <td>{Object.keys(types).join(", ")}</td>
+                  <td>{stats.requiredAttrs.has(an) ? "required" : "optional"}</td>
                 </tr>
               ))}
             </tbody>

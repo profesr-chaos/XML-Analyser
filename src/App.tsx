@@ -67,8 +67,12 @@ export default function App() {
       onDrop={onDrop}
     >
       {/* Toolbar */}
-      <div className="flex items-center gap-3 px-3 py-2 border-b border-[var(--color-border)] bg-[var(--color-panel)]">
-        <span className="font-semibold">XML Analyser</span>
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-[var(--color-border)] bg-[var(--color-panel)]">
+        {/* Left: brand + primary action */}
+        <span className="font-semibold tracking-tight flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-[var(--color-accent)]" />
+          XML Analyser
+        </span>
         <input
           ref={fileInput}
           type="file"
@@ -76,34 +80,40 @@ export default function App() {
           className="hidden"
           onChange={(e) => e.target.files?.[0] && loadFile(e.target.files[0], a ? "b" : "a")}
         />
-        <button className="btn" onClick={() => fileInput.current?.click()}>Open…</button>
-        {a && (
-          <span className="text-sm text-[var(--color-muted)]">
-            {nameA}
-            {nameB && <> ↔ {nameB}</>}
-          </span>
-        )}
-        {nsFilter && (
-          <button className="btn" onClick={() => setNsFilter(undefined)}>
-            ns: {nsFilter} ✕
+        <button className="btn-primary" onClick={() => fileInput.current?.click()}>
+          + Open
+        </button>
+
+        {/* Center: current file(s) + transient state */}
+        <div className="flex-1 flex items-center gap-2 min-w-0 px-2">
+          {a && (
+            <span className="text-sm text-[var(--color-muted)] truncate" title={`${nameA}${nameB ? " ↔ " + nameB : ""}`}>
+              <span className="text-[var(--color-fg)]">{nameA}</span>
+              {nameB && <> ↔ {nameB}</>}
+            </span>
+          )}
+          {nsFilter && (
+            <button className="chip" onClick={() => setNsFilter(undefined)}>
+              ns: {nsFilter} ✕
+            </button>
+          )}
+          {loading && <span className="text-sm text-[var(--color-accent)]">Parsing…</span>}
+        </div>
+
+        {/* Right: view controls */}
+        <div className="flex items-center gap-2 pl-2 border-l border-[var(--color-border)]">
+          <div className="seg" title="Path display">
+            <button data-active={fullPaths} onClick={() => fullPaths || toggleFullPaths()}>Full</button>
+            <button data-active={!fullPaths} onClick={() => fullPaths && toggleFullPaths()}>Leaf</button>
+          </div>
+          <button
+            className="icon-btn"
+            title={light ? "Switch to dark" : "Switch to light"}
+            onClick={() => setLight((l) => !l)}
+          >
+            {light ? "🌙" : "☀"}
           </button>
-        )}
-        <div className="flex-1" />
-        {loading && <span className="text-sm text-[var(--color-accent)]">Parsing…</span>}
-        <button
-          className="btn"
-          title="Toggle full path / leaf name"
-          onClick={toggleFullPaths}
-        >
-          {fullPaths ? "Paths: full" : "Paths: leaf"}
-        </button>
-        <button
-          className="btn"
-          title={light ? "Switch to dark" : "Switch to light"}
-          onClick={() => setLight((l) => !l)}
-        >
-          {light ? "🌙" : "☀"}
-        </button>
+        </div>
       </div>
 
       {error && (

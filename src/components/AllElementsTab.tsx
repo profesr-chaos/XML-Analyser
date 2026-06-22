@@ -38,37 +38,33 @@ export default function AllElementsTab({ result }: { result: AnalysisResult }) {
         </span>
       </div>
       <div className="overflow-auto flex-1">
-        <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-[var(--color-panel)] text-left text-[var(--color-muted)]">
+        <table className="tbl">
+          <thead>
             <tr>
-              <th className="p-2">Path</th>
-              <th className="p-2 text-right">Count</th>
-              <th className="p-2">Type</th>
-              <th className="p-2">Attributes</th>
-              <th className="p-2">Parents</th>
-              <th className="p-2">Sample</th>
+              <th>Path</th>
+              <th className="num">Count</th>
+              <th>Type</th>
+              <th>Attributes</th>
+              <th>Parents</th>
+              <th>Sample</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((s) => {
               const depth = s.path.split("/").length - 2;
               return (
-                <tr
-                  key={s.path}
-                  onClick={() => setSelected(s.path)}
-                  className="border-t border-[var(--color-border)] cursor-pointer hover:bg-[var(--color-panel2)]"
-                >
-                  <td className="p-2" style={{ paddingLeft: depth * 12 + 8 }}>
+                <tr key={s.path} onClick={() => setSelected(s.path)} className="cursor-pointer">
+                  <td style={{ paddingLeft: depth * 12 + 10 }}>
                     {s.path.split("/").pop()}
                     {s.isMixedType && <span className="ml-1 text-amber-400" title="Mixed types">⚠</span>}
                   </td>
-                  <td className="p-2 text-right text-[var(--color-muted)]">{s.count}</td>
-                  <td className="p-2">{contentType(s)}</td>
-                  <td className="p-2 text-[var(--color-muted)]">{Object.keys(s.attrs).join(", ")}</td>
-                  <td className="p-2 text-[var(--color-muted)] text-xs">
+                  <td className="num text-[var(--color-muted)]">{s.count}</td>
+                  <td>{contentType(s)}</td>
+                  <td className="text-[var(--color-muted)]">{Object.keys(s.attrs).join(", ")}</td>
+                  <td className="text-[var(--color-muted)] text-xs">
                     {Array.from(s.parents).map((p) => p.split("/").pop()).join(", ")}
                   </td>
-                  <td className="p-2 text-[var(--color-muted)] truncate max-w-xs">{s.samples[0] ?? ""}</td>
+                  <td className="text-[var(--color-muted)] truncate max-w-xs">{s.samples[0] ?? ""}</td>
                 </tr>
               );
             })}

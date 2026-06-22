@@ -1,36 +1,82 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { AnalysisResult } from "../core/types";
 import { lineDiff, schemaDiff, type SchemaDiffResult } from "../core/diff";
 import { useStore } from "../state/store";
+import PathLabel from "./PathLabel";
+
+const CONTEXT = 3; // unchanged lines kept around each change
+const ROW_CAP = 20000; // hard ceiling on rendered rows
+
+type Row = { kind: "add" | "del" | "ctx" | "fold"; text: string };
+
+/** Flatten diff hunks into rows, collapsing long unchanged runs to "… N unchanged …". */
+function toRows(changes: ReturnType<typeof lineDiff>["changes"]): Row[] {
+  const rows: Row[] = [];
+  for (const c of changes) {
+    const lines = c.value.replace(/\n$/, "").split("\n");
+    if (c.added) lines.forEach((t) => rows.push({ kind: "add", text: t }));
+    else if (c.removed) lines.forEach((t) => rows.push({ kind: "del", text: t }));
+    else if (lines.length > CONTEXT * 2 + 1) {
+      lines.slice(0, CONTEXT).forEach((t) => rows.push({ kind: "ctx", text: t }));
+      rows.push({ kind: "fold", text: `⋯ ${lines.length - CONTEXT * 2} unchanged lines ⋯` });
+      lines.slice(-CONTEXT).forEach((t) => rows.push({ kind: "ctx", text: t }));
+    } else lines.forEach((t) => rows.push({ kind: "ctx", text: t }));
+  }
+  return rows;
+}
 
 function LineDiff({ rawA, rawB }: { rawA: string; rawB: string }) {
-  const { changes, added, removed } = useMemo(() => lineDiff(rawA, rawB), [rawA, rawB]);
+  const [res, setRes] = useState<ReturnType<typeof lineDiff> | null>(null);
+
+  useEffect(() => {
+    setRes(null);
+    // Yield so the "Computing…" state paints before the diff blocks the thread.
+    const id = setTimeout(() => setRes(lineDiff(rawA, rawB)), 0);
+    return () => clearTimeout(id);
+  }, [rawA, rawB]);
+
+  const rows = useMemo(() => (res ? toRows(res.changes) : []), [res]);
+
+  if (!res) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-[var(--color-muted)]">
+        Computing line diff…
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full">
       <div className="p-2 text-sm text-[var(--color-muted)]">
-        <span className="text-emerald-400">+{added}</span>{" "}
-        <span className="text-rose-400">−{removed}</span> lines changed
+        <span className="text-emerald-400">+{res.added}</span>{" "}
+        <span className="text-rose-400">−{res.removed}</span> lines changed
       </div>
       <pre className="flex-1 overflow-auto text-xs font-mono leading-5">
-        {changes.map((c, i) =>
-          c.value
-            .replace(/\n$/, "")
-            .split("\n")
-            .map((line, j) => (
-              <div
-                key={`${i}-${j}`}
-                className={
-                  c.added
-                    ? "bg-emerald-950/60 text-emerald-300"
-                    : c.removed
-                      ? "bg-rose-950/60 text-rose-300"
-                      : "text-[var(--color-muted)]"
-                }
-              >
-                <span className="select-none opacity-50">{c.added ? "+" : c.removed ? "−" : " "} </span>
-                {line}
-              </div>
-            )),
+        {rows.slice(0, ROW_CAP).map((r, i) =>
+          r.kind === "fold" ? (
+            <div key={i} className="text-center text-[var(--color-muted)] bg-[var(--color-panel2)] my-1">
+              {r.text}
+            </div>
+          ) : (
+            <div
+              key={i}
+              className={
+                r.kind === "add"
+                  ? "bg-emerald-950/60 text-emerald-300"
+                  : r.kind === "del"
+                    ? "bg-rose-950/60 text-rose-300"
+                    : "text-[var(--color-muted)]"
+              }
+            >
+              <span className="select-none opacity-50">
+                {r.kind === "add" ? "+" : r.kind === "del" ? "−" : " "}{" "}
+              </span>
+              {r.text}
+            </div>
+          ),
+        )}
+        {rows.length > ROW_CAP && (
+          <div className="text-amber-400 p-2">Output truncated at {ROW_CAP} rows.</div>
         )}
       </pre>
     </div>
@@ -98,7 +144,7 @@ function SchemaDiff({ a, b }: { a: AnalysisResult; b: AnalysisResult }) {
           <section key={title}>
             <h4 className={`font-semibold mb-1 ${color}`}>{title} ({items.length})</h4>
             {items.map((i) => (
-              <div key={i} className="font-mono pl-2">{i}</div>
+              <PathLabel key={i} path={i} className="font-mono pl-2 block" />
             ))}
           </section>
         ))}
@@ -108,7 +154,7 @@ function SchemaDiff({ a, b }: { a: AnalysisResult; b: AnalysisResult }) {
             .filter((t) => t.path.toLowerCase().includes(ql))
             .map((t) => (
               <div key={t.path} className="font-mono pl-2">
-                {t.path}: {t.fromType} → {t.toType}
+                <PathLabel path={t.path} /> <span className="text-[var(--color-muted)]">{t.fromType} → {t.toType}</span>
               </div>
             ))}
         </section>

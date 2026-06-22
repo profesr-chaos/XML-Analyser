@@ -1,10 +1,10 @@
 import { useMemo } from "react";
 import type { AnalysisResult, ElementStats } from "../core/types";
-import { useStore, leaf } from "../state/store";
+import { useStore } from "../state/store";
+import PathLabel from "./PathLabel";
 
 function Group({ title, items, render }: { title: string; items: ElementStats[]; render: (s: ElementStats) => string }) {
   const setSelected = useStore((s) => s.setSelected);
-  const fullPaths = useStore((s) => s.fullPaths);
   if (!items.length) return null;
   return (
     <section>
@@ -18,7 +18,7 @@ function Group({ title, items, render }: { title: string; items: ElementStats[];
             onClick={() => setSelected(s.path)}
             className="flex justify-between text-sm cursor-pointer hover:text-[var(--color-accent)] bg-[var(--color-panel2)] rounded px-2 py-1"
           >
-            <span className="font-mono" title={s.path}>{fullPaths ? s.path : leaf(s.path)}</span>
+            <PathLabel path={s.path} className="font-mono truncate" />
             <span className="text-[var(--color-muted)]">{render(s)}</span>
           </div>
         ))}

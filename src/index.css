@@ -6,8 +6,9 @@
   --color-panel2: #1e222b;
   --color-border: #2a2f3a;
   --color-fg: #e6e8eb;
-  --color-muted: #8b93a1;
+  --color-muted: #a6aec0; /* lifted for AA on dark panels (text-xs is everywhere) */
   --color-accent: #5b9dff;
+  --color-bar: #8b7bf0; /* magnitude bars only — distinct from interactive accent */
 }
 
 /* Light mode: override the palette when html has .light (default is dark). */
@@ -17,8 +18,9 @@ html.light {
   --color-panel2: #eef0f4;
   --color-border: #d6dae1;
   --color-fg: #1a1d23;
-  --color-muted: #5c636e;
+  --color-muted: #4f5560; /* darkened for AA on light panels */
   --color-accent: #2563eb;
+  --color-bar: #6d5cd6;
 }
 
 html, body, #root { height: 100%; }
@@ -39,3 +41,60 @@ body {
   cursor: pointer;
 }
 .btn:hover { border-color: var(--color-accent); }
+
+.btn-primary {
+  font-size: .8rem;
+  padding: .25rem .7rem;
+  border-radius: .375rem;
+  background: var(--color-accent);
+  color: #fff;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+.btn-primary:hover { filter: brightness(1.1); }
+
+.icon-btn {
+  width: 1.9rem;
+  height: 1.9rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: .375rem;
+  background: var(--color-panel2);
+  cursor: pointer;
+}
+.icon-btn:hover { border-color: var(--color-accent); }
+
+/* Segmented toggle (e.g. Full / Leaf) */
+.seg { display: inline-flex; border: 1px solid var(--color-border); border-radius: .375rem; overflow: hidden; }
+.seg button { font-size: .75rem; padding: .2rem .55rem; background: transparent; color: var(--color-muted); cursor: pointer; }
+.seg button[data-active="true"] { background: var(--color-accent); color: #fff; }
+
+.chip {
+  font-size: .75rem;
+  padding: .15rem .5rem;
+  border-radius: 9999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-panel2);
+  cursor: pointer;
+}
+.chip:hover { border-color: var(--color-accent); }
+
+/* Shared data table: readable rows, sticky header, zebra + hover, aligned numerals */
+.tbl { width: 100%; font-size: .8rem; border-collapse: collapse; }
+.tbl thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--color-panel);
+  color: var(--color-muted);
+  text-align: left;
+  font-weight: 600;
+  padding: .5rem .65rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.tbl tbody td { padding: .45rem .65rem; border-bottom: 1px solid var(--color-border); }
+.tbl tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--color-panel2) 35%, transparent); }
+.tbl tbody tr:hover td { background: var(--color-panel2); }
+.tbl .num { text-align: right; font-variant-numeric: tabular-nums; }
