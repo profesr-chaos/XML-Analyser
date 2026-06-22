@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0f1115;
+  --color-panel: #171a21;
+  --color-panel2: #1e222b;
+  --color-border: #2a2f3a;
+  --color-fg: #e6e8eb;
+  --color-muted: #8b93a1;
+  --color-accent: #5b9dff;
+}
+
+/* Light mode: override the palette when html has .light (default is dark). */
+html.light {
+  --color-bg: #f7f8fa;
+  --color-panel: #ffffff;
+  --color-panel2: #eef0f4;
+  --color-border: #d6dae1;
+  --color-fg: #1a1d23;
+  --color-muted: #5c636e;
+  --color-accent: #2563eb;
+}
+
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+* { scrollbar-color: var(--color-border) transparent; }
+
+.btn {
+  font-size: .8rem;
+  padding: .25rem .6rem;
+  border: 1px solid var(--color-border);
+  border-radius: .375rem;
+  background: var(--color-panel2);
+  cursor: pointer;
+}
+.btn:hover { border-color: var(--color-accent); }

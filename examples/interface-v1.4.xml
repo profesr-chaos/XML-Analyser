@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<roster xmlns="http://intf.mb.ivu.de/">
+  <employeeAllocation id="1" shift="early">
+    <employee number="1001">
+      <name>Alice Brown</name>
+      <grade>3</grade>
+      <startDate>2024-01-15</startDate>
+    </employee>
+    <vehicle>BUS-204</vehicle>
+  </employeeAllocation>
+  <employeeAllocation id="2" shift="late">
+    <employee number="1002">
+      <name>Bob Stone</name>
+      <grade>2</grade>
+      <startDate>2023-09-01</startDate>
+    </employee>
+    <vehicle>BUS-118</vehicle>
+  </employeeAllocation>
+</roster>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<roster xmlns="http://intf.mb.ivu.de/">
+  <employeeAllocation id="1" shift="early" depot="north">
+    <employee number="1001">
+      <name>Alice Brown</name>
+      <grade>senior</grade>
+      <startDate>2024-01-15</startDate>
+      <email>alice@example.com</email>
+    </employee>
+    <vehicle>BUS-204</vehicle>
+  </employeeAllocation>
+  <employeeAllocation id="2" shift="late" depot="south">
+    <employee number="1002">
+      <name>Bob Stone</name>
+      <grade>junior</grade>
+      <startDate>2023-09-01</startDate>
+      <email>bob@example.com</email>
+    </employee>
+    <vehicle>BUS-118</vehicle>
+    <vehicle>BUS-119</vehicle>
+  </employeeAllocation>
+</roster>
