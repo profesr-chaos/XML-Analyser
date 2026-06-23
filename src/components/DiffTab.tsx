@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { AnalysisResult } from "../core/types";
 import { lineDiff, schemaDiff, type SchemaDiffResult } from "../core/diff";
 import { useStore } from "../state/store";
@@ -163,79 +163,46 @@ function SchemaDiff({ a, b }: { a: AnalysisResult; b: AnalysisResult }) {
   );
 }
 
-function FileSlot({
-  label,
-  name,
-  slot,
-}: {
-  label: string;
-  name?: string;
-  slot: "a" | "b";
-}) {
-  const loadFile = useStore((s) => s.loadFile);
-  const input = useRef<HTMLInputElement>(null);
-  const [over, setOver] = useState(false);
-  const pick = (f?: File) => f && /\.xml$/i.test(f.name) && loadFile(f, slot);
-
-  return (
-    <div
-      onDragOver={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setOver(true);
-      }}
-      onDragLeave={(e) => {
-        e.stopPropagation();
-        setOver(false);
-      }}
-      onDrop={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setOver(false);
-        pick(Array.from(e.dataTransfer.files)[0]);
-      }}
-      className={`flex-1 border-2 border-dashed rounded-lg p-4 text-center ${
-        over ? "border-[var(--color-accent)] bg-[var(--color-panel2)]" : "border-[var(--color-border)]"
-      }`}
-    >
-      <div className="text-xs uppercase tracking-wide text-[var(--color-muted)]">{label}</div>
-      <div className="my-1 font-mono text-sm truncate">{name ?? "no file"}</div>
-      <input
-        ref={input}
-        type="file"
-        accept=".xml"
-        className="hidden"
-        onChange={(e) => pick(e.target.files?.[0] ?? undefined)}
-      />
-      <button className="btn" onClick={() => input.current?.click()}>
-        {name ? "Replace…" : "Choose file…"}
-      </button>
-      <div className="text-xs text-[var(--color-muted)] mt-1">or drop here</div>
-    </div>
-  );
-}
-
 export default function DiffTab({ a }: { a?: AnalysisResult }) {
   const b = useStore((s) => s.b);
   const rawA = useStore((s) => s.rawA);
   const rawB = useStore((s) => s.rawB);
   const nameA = useStore((s) => s.nameA);
-  const nameB = useStore((s) => s.nameB);
+  const tabs = useStore((s) => s.tabs);
+  const activeId = useStore((s) => s.activeId);
+  const compareId = useStore((s) => s.compareId);
+  const setCompare = useStore((s) => s.setCompare);
   const [sub, setSub] = useState<"line" | "schema">("schema");
 
-  const ready = b && rawA && rawB;
+  const others = tabs.filter((t) => t.id !== activeId);
+  const ready = a && b && rawA && rawB;
 
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-3 p-3 border-b border-[var(--color-border)]">
-        <FileSlot label="File A" name={nameA} slot="a" />
+        <div className="flex-1 border border-[var(--color-border)] rounded-lg p-3 text-center bg-[var(--color-panel2)]">
+          <div className="text-xs uppercase tracking-wide text-[var(--color-muted)]">File A (active tab)</div>
+          <div className="my-1 font-mono text-sm truncate">{nameA ?? "no file"}</div>
+        </div>
         <span className="text-[var(--color-muted)] shrink-0">↔</span>
-        <FileSlot label="File B" name={nameB} slot="b" />
+        <div className="flex-1 border border-[var(--color-border)] rounded-lg p-3 text-center">
+          <div className="text-xs uppercase tracking-wide text-[var(--color-muted)]">File B (compare)</div>
+          <select
+            value={compareId ?? ""}
+            onChange={(e) => setCompare(e.target.value || undefined)}
+            className="my-1 w-full px-2 py-1 bg-[var(--color-panel2)] border border-[var(--color-border)] rounded text-sm outline-none"
+          >
+            <option value="">Compare with…</option>
+            {others.map((t) => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {!ready ? (
-        <div className="flex-1 flex items-center justify-center text-[var(--color-muted)]">
-          Load a file into each side to compare.
+        <div className="flex-1 flex items-center justify-center text-[var(--color-muted)] px-4 text-center">
+          {others.length ? "Pick a tab to compare against." : "Open another file (＋ Open) to compare."}
         </div>
       ) : (
         <>

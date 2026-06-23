@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { inferType } from "./inferType";
 import { analyse, XmlParseError } from "./analyse";
 import { lineDiff, schemaDiff, contentType, prettyXml } from "./diff";
+import { formatXml } from "./format";
 import { markdownDoc, htmlDoc, jsonDump, textReport } from "./docgen";
 
 describe("inferType", () => {
@@ -126,6 +127,17 @@ describe("diff", () => {
     const d = lineDiff(v14, v15);
     expect(d.added).toBeGreaterThan(0);
     expect(prettyXml(v14)).toContain("<user");
+  });
+
+  it("formatXml indents and preserves comments + CDATA", () => {
+    const f = formatXml(`<r><!-- hi --><a>x</a><b><![CDATA[<raw>]]></b></r>`);
+    expect(f).toContain("\n  <a>x</a>"); // child indented one level
+    expect(f).toContain("<!-- hi -->"); // comment kept (old prettyXml dropped it)
+    expect(f).toContain("<![CDATA[<raw>]]>"); // CDATA kept verbatim
+  });
+
+  it("formatXml leaves malformed input untouched", () => {
+    expect(formatXml(`<a><b></a>`)).toBe(`<a><b></a>`);
   });
 
   it("contentType picks dominant non-empty type", () => {

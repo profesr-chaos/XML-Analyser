@@ -1,3 +1,4 @@
+import { SaxesParser, type SaxesTag, type SaxesTagNS } from "saxes";
 import type {
   AnalysisResult,
   DataType,
@@ -61,33 +62,22 @@ function newAcc(path: string): Acc {
   };
 }
 
-function localName(el: Element): string {
-  // strip namespace prefix for readability (spec 2.1 / 5.6)
-  return el.localName || el.tagName.replace(/^.*:/, "");
+/** One open element on the parse stack, accumulating until its close tag. */
+interface Frame {
+  path: string;
+  acc: Acc;
+  textParts: string[];
+  childCounts: Map<string, number>; // child path -> occurrences under this instance
+  hasChildren: boolean;
 }
 
-/** Concatenated direct text of an element (ignores text inside child elements). */
-function directText(el: Element): string {
-  let s = "";
-  for (const node of Array.from(el.childNodes)) {
-    if (node.nodeType === 3 /* TEXT */ || node.nodeType === 4 /* CDATA */) {
-      s += node.nodeValue ?? "";
-    }
-  }
-  return s.trim();
-}
-
+/**
+ * Stream the document with a namespace-aware SAX parser (saxes) — no DOM, so it
+ * runs in a Web Worker and keeps peak memory flat on large files. Behaviour
+ * matches the former DOMParser walk: local names in paths, namespace tallies,
+ * a thrown XmlParseError (with line) on malformed input or unbound prefixes.
+ */
 export function analyse(xml: string, filePath = ""): AnalysisResult {
-  const doc = new DOMParser().parseFromString(xml, "application/xml");
-  const perr = doc.querySelector("parsererror");
-  if (perr) {
-    const msg = perr.textContent?.trim() || "Malformed XML";
-    const lc = /^(\d+):(\d+):/.exec(msg);
-    throw new XmlParseError(msg, lc ? +lc[1] : undefined, lc ? +lc[2] : undefined);
-  }
-  const root = doc.documentElement;
-  if (!root) throw new XmlParseError("Empty or invalid XML document");
-
   const encoding =
     /encoding\s*=\s*["']([^"']+)["']/i.exec(xml.slice(0, 200))?.[1] ?? "UTF-8";
 
@@ -100,6 +90,7 @@ export function analyse(xml: string, filePath = ""): AnalysisResult {
   let totalElements = 0;
   let totalAttrs = 0;
   let maxDepth = 0;
+  let rootTag = "";
 
   function getAcc(path: string): Acc {
     let a = accs.get(path);
@@ -107,32 +98,45 @@ export function analyse(xml: string, filePath = ""): AnalysisResult {
     return a;
   }
 
-  function walk(el: Element, parentPath: string | null, depth: number) {
-    const path = parentPath === null ? `/${localName(el)}` : `${parentPath}/${localName(el)}`;
+  const stack: Frame[] = [];
+  let parseError: Error | null = null;
+  let errLine = 0;
+  let errCol = 0;
+
+  const parser = new SaxesParser({ xmlns: true, fileName: filePath || undefined });
+
+  parser.on("error", (e) => {
+    if (!parseError) {
+      parseError = e;
+      errLine = parser.line;
+      errCol = parser.column;
+    }
+  });
+
+  parser.on("opentag", (tag: SaxesTag) => {
+    const node = tag as SaxesTagNS; // xmlns:true => local/prefix/uri/attributes are present
+    const local = node.local;
+    const parent = stack[stack.length - 1];
+    const path = parent ? `${parent.path}/${local}` : `/${local}`;
+    const depth = stack.length;
     if (depth > maxDepth) maxDepth = depth;
+    if (!rootTag) rootTag = local;
     totalElements++;
 
     const acc = getAcc(path);
     acc.count++;
-    acc.namespace = el.namespaceURI;
-    if (parentPath !== null) acc.parents.add(parentPath);
+    acc.namespace = node.uri || null;
+    if (parent) acc.parents.add(parent.path);
 
-    // namespace
-    if (el.namespaceURI) {
-      const entry = nsByUri.get(el.namespaceURI);
+    if (node.uri) {
+      const entry = nsByUri.get(node.uri);
       if (entry) entry.count++;
-      else nsByUri.set(el.namespaceURI, { prefix: el.prefix || null, count: 1 });
-    } else if (el.tagName.includes(":")) {
-      undefinedNs.add(el.tagName.split(":")[0]);
+      else nsByUri.set(node.uri, { prefix: node.prefix || null, count: 1 });
     }
 
-    // attributes
-    for (const attr of Array.from(el.attributes)) {
-      if (attr.name === "xmlns" || attr.name.startsWith("xmlns:")) continue;
-      if (!attr.namespaceURI && attr.name.includes(":") && attr.name.split(":")[0] !== "xml") {
-        undefinedNs.add(attr.name.split(":")[0]);
-      }
-      const an = attr.localName || attr.name.replace(/^.*:/, "");
+    for (const [qname, attr] of Object.entries(node.attributes)) {
+      if (qname === "xmlns" || qname.startsWith("xmlns:") || attr.prefix === "xmlns") continue;
+      const an = attr.local || qname.replace(/^.*:/, "");
       totalAttrs++;
       acc.attrPresence[an] = (acc.attrPresence[an] ?? 0) + 1;
       const t = inferType(attr.value);
@@ -140,15 +144,32 @@ export function analyse(xml: string, filePath = ""): AnalysisResult {
       bag[t] = (bag[t] ?? 0) + 1;
     }
 
-    // text value
-    const text = directText(el);
+    if (parent) {
+      parent.hasChildren = true;
+      parent.acc.children.add(local);
+      parent.childCounts.set(path, (parent.childCounts.get(path) ?? 0) + 1);
+    }
+
+    stack.push({ path, acc, textParts: [], childCounts: new Map(), hasChildren: false });
+  });
+
+  const onText = (t: string) => {
+    const f = stack[stack.length - 1];
+    if (f) f.textParts.push(t);
+  };
+  parser.on("text", onText);
+  parser.on("cdata", onText);
+
+  parser.on("closetag", () => {
+    const frame = stack.pop();
+    if (!frame) return;
+    const acc = frame.acc;
+    const text = frame.textParts.join("").trim();
     const t = inferType(text);
     acc.types[t] = (acc.types[t] ?? 0) + 1;
     if (t === "empty") acc.emptyCount++;
     else {
-      if (acc.samples.length < MAX_SAMPLES && !acc.samples.includes(text)) {
-        acc.samples.push(text);
-      }
+      if (acc.samples.length < MAX_SAMPLES && !acc.samples.includes(text)) acc.samples.push(text);
       if (acc.distinctValues) {
         acc.distinctValues.set(text, (acc.distinctValues.get(text) ?? 0) + 1);
         if (acc.distinctValues.size > ENUM_CAP) acc.distinctValues = null;
@@ -165,25 +186,27 @@ export function analyse(xml: string, filePath = ""): AnalysisResult {
         acc.numN++;
       }
     }
-
-    // children + cardinality bookkeeping
-    const childEls = Array.from(el.children);
-    const childCounts = new Map<string, number>();
-    for (const child of childEls) {
-      const cpath = `${path}/${localName(child)}`;
-      acc.children.add(localName(child));
-      childCounts.set(cpath, (childCounts.get(cpath) ?? 0) + 1);
+    if (frame.hasChildren) {
+      let arr = instanceChildren.get(frame.path);
+      if (!arr) instanceChildren.set(frame.path, (arr = []));
+      arr.push(frame.childCounts);
     }
-    if (childEls.length) {
-      let arr = instanceChildren.get(path);
-      if (!arr) instanceChildren.set(path, (arr = []));
-      arr.push(childCounts);
-    }
+  });
 
-    for (const child of childEls) walk(child, path, depth + 1);
+  try {
+    parser.write(xml).close();
+  } catch (e) {
+    if (!parseError) {
+      parseError = e as Error;
+      errLine = parser.line;
+      errCol = parser.column;
+    }
   }
 
-  walk(root, null, 0);
+  if (parseError) {
+    throw new XmlParseError((parseError as Error).message || "Malformed XML", errLine || 1, errCol);
+  }
+  if (!rootTag) throw new XmlParseError("Empty or invalid XML document");
 
   // Condense accumulators -> ElementStats
   const pathStats = new Map<string, ElementStats>();
@@ -253,7 +276,7 @@ export function analyse(xml: string, filePath = ""): AnalysisResult {
     filePath,
     fileSize: xml.length,
     encoding,
-    rootTag: localName(root),
+    rootTag,
     totalElements,
     uniquePaths: pathStats.size,
     totalAttrs,

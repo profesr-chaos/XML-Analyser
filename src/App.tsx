@@ -7,6 +7,7 @@ import ElementDetailTab from "./components/ElementDetailTab";
 import StatisticsTab from "./components/StatisticsTab";
 import DocumentationTab from "./components/DocumentationTab";
 import DiffTab from "./components/DiffTab";
+import EditorTab from "./components/EditorTab";
 
 const TABS: [TabKey, string][] = [
   ["summary", "Summary"],
@@ -14,13 +15,17 @@ const TABS: [TabKey, string][] = [
   ["detail", "Element Detail"],
   ["statistics", "Statistics"],
   ["documentation", "Documentation"],
+  ["editor", "Editor"],
   ["diff", "Diff"],
 ];
 
 export default function App() {
-  const { a, b, loading, error, tab, nameA, nameB, nsFilter, fullPaths } = useStore();
+  const { a, b, loading, error, tab, nsFilter, fullPaths, tabs, activeId, rawA } = useStore();
   const setTab = useStore((s) => s.setTab);
-  const loadFile = useStore((s) => s.loadFile);
+  const openFile = useStore((s) => s.openFile);
+  const setActive = useStore((s) => s.setActive);
+  const closeTab = useStore((s) => s.closeTab);
+  const closeAll = useStore((s) => s.closeAll);
   const setNsFilter = useStore((s) => s.setNsFilter);
   const toggleFullPaths = useStore((s) => s.toggleFullPaths);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -52,8 +57,7 @@ export default function App() {
     e.preventDefault();
     setDragging(false);
     const files = Array.from(e.dataTransfer.files).filter((f) => /\.xml$/i.test(f.name));
-    if (files[0]) loadFile(files[0], a ? "b" : "a");
-    if (files[1]) loadFile(files[1], "b"); // two files -> straight to diff
+    files.forEach((f) => openFile(f)); // each dropped file opens its own tab
   }
 
   return (
@@ -68,8 +72,8 @@ export default function App() {
     >
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-[var(--color-border)] bg-[var(--color-panel)]">
-        {/* Left: brand + primary action */}
-        <span className="font-semibold tracking-tight flex items-center gap-1.5">
+        {/* Left: brand */}
+        <span className="font-semibold tracking-tight flex items-center gap-1.5 shrink-0">
           <span className="w-2 h-2 rounded-full bg-[var(--color-accent)]" />
           XML Analyser
         </span>
@@ -77,27 +81,55 @@ export default function App() {
           ref={fileInput}
           type="file"
           accept=".xml"
+          multiple
           className="hidden"
-          onChange={(e) => e.target.files?.[0] && loadFile(e.target.files[0], a ? "b" : "a")}
+          onChange={(e) => {
+            Array.from(e.target.files ?? []).forEach((f) => openFile(f));
+            e.target.value = ""; // allow re-opening the same file
+          }}
         />
-        <button className="btn-primary" onClick={() => fileInput.current?.click()}>
-          + Open
-        </button>
 
-        {/* Center: current file(s) + transient state */}
-        <div className="flex-1 flex items-center gap-2 min-w-0 px-2">
-          {a && (
-            <span className="text-sm text-[var(--color-muted)] truncate" title={`${nameA}${nameB ? " ↔ " + nameB : ""}`}>
-              <span className="text-[var(--color-fg)]">{nameA}</span>
-              {nameB && <> ↔ {nameB}</>}
-            </span>
+        {/* Center: open file tabs + open/close-all */}
+        <div className="flex-1 flex items-center gap-1 min-w-0 overflow-x-auto px-1">
+          {tabs.map((t) => (
+            <div
+              key={t.id}
+              onClick={() => setActive(t.id)}
+              title={t.name}
+              className={`group flex items-center gap-1.5 pl-2.5 pr-1 py-1 rounded text-sm cursor-pointer shrink-0 max-w-52 ${
+                t.id === activeId
+                  ? "bg-[var(--color-bg)] text-[var(--color-fg)] border border-[var(--color-border)]"
+                  : "text-[var(--color-muted)] hover:text-[var(--color-fg)] hover:bg-[var(--color-panel2)]"
+              }`}
+            >
+              {t.error && <span title={t.error}>⚠</span>}
+              <span className="truncate">{t.name}</span>
+              <button
+                className="w-4 h-4 rounded text-[var(--color-muted)] hover:bg-[var(--color-border)] hover:text-[var(--color-fg)] shrink-0"
+                title="Close tab"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeTab(t.id);
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+          <button className="btn-primary shrink-0" onClick={() => fileInput.current?.click()} title="Open XML file(s)">
+            + Open
+          </button>
+          {tabs.length > 1 && (
+            <button className="btn shrink-0" onClick={closeAll} title="Close all tabs">
+              Close all
+            </button>
           )}
           {nsFilter && (
-            <button className="chip" onClick={() => setNsFilter(undefined)}>
+            <button className="chip shrink-0" onClick={() => setNsFilter(undefined)}>
               ns: {nsFilter} ✕
             </button>
           )}
-          {loading && <span className="text-sm text-[var(--color-accent)]">Parsing…</span>}
+          {loading && <span className="text-sm text-[var(--color-accent)] shrink-0">Parsing…</span>}
         </div>
 
         {/* Right: view controls */}
@@ -157,10 +189,16 @@ export default function App() {
             ))}
           </nav>
           <div className="flex-1 min-h-0">
-            {tab === "diff" ? (
+            {!activeId ? (
+              <EmptyState onOpen={() => fileInput.current?.click()} dragging={dragging} />
+            ) : tab === "editor" ? (
+              <EditorTab id={activeId} raw={rawA ?? ""} />
+            ) : tab === "diff" ? (
               <DiffTab a={a} />
             ) : !a ? (
-              <EmptyState onOpen={() => fileInput.current?.click()} dragging={dragging} />
+              <div className="flex-1 flex items-center justify-center h-full text-[var(--color-muted)]">
+                {loading ? "Parsing…" : "Select a tab to analyse."}
+              </div>
             ) : (
               <>
                 {tab === "summary" && <SummaryTab result={a} />}

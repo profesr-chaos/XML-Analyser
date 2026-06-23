@@ -1,48 +1,9 @@
 import { diffLines, type Change } from "diff";
 import type { AnalysisResult, DataType, ElementStats } from "./types";
 
-const esc = (s: string) =>
-  s.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" })[c]!);
-const escAttr = (s: string) =>
-  s.replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" })[c]!);
-
-/** Opening tag built directly from name + attributes — O(1) per element. */
-function openTag(el: Element): string {
-  let s = "<" + el.tagName;
-  for (const a of Array.from(el.attributes)) s += ` ${a.name}="${escAttr(a.value)}"`;
-  return s;
-}
-
-function directText(el: Element): string {
-  let t = "";
-  for (const n of Array.from(el.childNodes)) if (n.nodeType === 3) t += n.nodeValue ?? "";
-  return t.trim();
-}
-
-/**
- * Pretty-print XML with indentation so line diffs are meaningful.
- * O(N): each element's tag is constructed once, never re-serialized.
- * ponytail: recursive walk; switch to an explicit stack if XML nests past ~10k deep.
- */
-export function prettyXml(xml: string): string {
-  const doc = new DOMParser().parseFromString(xml, "application/xml");
-  if (doc.querySelector("parsererror") || !doc.documentElement) return xml;
-  const out: string[] = [];
-
-  function walk(el: Element, indent: string) {
-    const childEls = el.children;
-    const text = directText(el);
-    if (!childEls.length) {
-      out.push(text ? `${indent}${openTag(el)}>${esc(text)}</${el.tagName}>` : `${indent}${openTag(el)}/>`);
-      return;
-    }
-    out.push(indent + openTag(el) + ">" + (text ? " " + esc(text) : ""));
-    for (let i = 0; i < childEls.length; i++) walk(childEls[i], indent + "  ");
-    out.push(`${indent}</${el.tagName}>`);
-  }
-  walk(doc.documentElement, "");
-  return out.join("\n");
-}
+// Pretty-printer now lives in format.ts (streaming, DOM-free, lossless).
+export { formatXml as prettyXml } from "./format";
+import { formatXml } from "./format";
 
 export interface LineDiffResult {
   changes: Change[];
@@ -51,7 +12,7 @@ export interface LineDiffResult {
 }
 
 export function lineDiff(a: string, b: string): LineDiffResult {
-  const changes = diffLines(prettyXml(a), prettyXml(b));
+  const changes = diffLines(formatXml(a), formatXml(b));
   let added = 0;
   let removed = 0;
   for (const c of changes) {
