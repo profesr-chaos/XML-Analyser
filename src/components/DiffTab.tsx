@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { AnalysisResult } from "../core/types";
-import { lineDiff, schemaDiff, type SchemaDiffResult } from "../core/diff";
+import { schemaDiff, type SchemaDiffResult, type LineDiffResult } from "../core/diff";
+import { lineDiffInWorker } from "../parseClient";
 import { useStore } from "../state/store";
 import PathLabel from "./PathLabel";
 
@@ -10,7 +11,7 @@ const ROW_CAP = 20000; // hard ceiling on rendered rows
 type Row = { kind: "add" | "del" | "ctx" | "fold"; text: string };
 
 /** Flatten diff hunks into rows, collapsing long unchanged runs to "… N unchanged …". */
-function toRows(changes: ReturnType<typeof lineDiff>["changes"]): Row[] {
+function toRows(changes: LineDiffResult["changes"]): Row[] {
   const rows: Row[] = [];
   for (const c of changes) {
     const lines = c.value.replace(/\n$/, "").split("\n");
@@ -26,13 +27,19 @@ function toRows(changes: ReturnType<typeof lineDiff>["changes"]): Row[] {
 }
 
 function LineDiff({ rawA, rawB }: { rawA: string; rawB: string }) {
-  const [res, setRes] = useState<ReturnType<typeof lineDiff> | null>(null);
+  const [res, setRes] = useState<LineDiffResult | null>(null);
 
   useEffect(() => {
     setRes(null);
-    // Yield so the "Computing…" state paints before the diff blocks the thread.
-    const id = setTimeout(() => setRes(lineDiff(rawA, rawB)), 0);
-    return () => clearTimeout(id);
+    // Format + diff run in the worker so large files don't block the UI.
+    let cancelled = false;
+    lineDiffInWorker(rawA, rawB).then(
+      (r) => !cancelled && setRes(r),
+      () => {},
+    );
+    return () => {
+      cancelled = true;
+    };
   }, [rawA, rawB]);
 
   const rows = useMemo(() => (res ? toRows(res.changes) : []), [res]);

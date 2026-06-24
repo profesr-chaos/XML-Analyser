@@ -3,12 +3,14 @@
 // are matched to replies by id.
 import ParseWorker from "./parse.worker?worker&inline";
 import type { AnalysisResult } from "./core/types";
+import type { LineDiffResult } from "./core/diff";
 import { XmlParseError } from "./core/analyse";
 
 type Reply = {
   id: number;
   result?: AnalysisResult;
   text?: string;
+  diff?: LineDiffResult;
   error?: { message: string; line?: number; column?: number };
 };
 
@@ -20,12 +22,12 @@ function ensureWorker(): Worker {
   if (worker) return worker;
   worker = new ParseWorker();
   worker.onmessage = (e: MessageEvent<Reply>) => {
-    const { id, result, text, error } = e.data;
+    const { id, result, text, diff, error } = e.data;
     const p = pending.get(id);
     if (!p) return;
     pending.delete(id);
     if (error) p.reject(new XmlParseError(error.message, error.line, error.column));
-    else p.resolve(result ?? text);
+    else p.resolve(result ?? text ?? diff);
   };
   worker.onerror = () => {
     // Worker crashed: fail everything in flight and rebuild on next call.
@@ -52,4 +54,8 @@ export function analyseInWorker(xml: string, name: string): Promise<AnalysisResu
 
 export function formatInWorker(xml: string): Promise<string> {
   return request<string>({ op: "format", xml });
+}
+
+export function lineDiffInWorker(a: string, b: string): Promise<LineDiffResult> {
+  return request<LineDiffResult>({ op: "linediff", a, b });
 }

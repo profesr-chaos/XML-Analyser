@@ -3,18 +3,23 @@
 // freezing the UI.
 import { analyse, XmlParseError } from "./core/analyse";
 import { formatXml } from "./core/format";
+import { lineDiff } from "./core/diff";
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
 
 type Req =
   | { id: number; op: "analyse"; xml: string; name: string }
-  | { id: number; op: "format"; xml: string };
+  | { id: number; op: "format"; xml: string }
+  | { id: number; op: "linediff"; a: string; b: string };
 
 ctx.onmessage = (e: MessageEvent<Req>) => {
   const msg = e.data;
   try {
     if (msg.op === "format") {
       ctx.postMessage({ id: msg.id, text: formatXml(msg.xml) });
+    } else if (msg.op === "linediff") {
+      // Change[] are plain objects — structured clone carries them fine.
+      ctx.postMessage({ id: msg.id, diff: lineDiff(msg.a, msg.b) });
     } else {
       // AnalysisResult holds Maps/Sets — structured clone carries those across fine.
       ctx.postMessage({ id: msg.id, result: analyse(msg.xml, msg.name) });
